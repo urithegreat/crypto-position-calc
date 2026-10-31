@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Position Size & Margin Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar & Input Styling */
+        body {
+            background-color: #090d16;
+            color: #f8fafc;
+        }
+        /* Hide number input arrows for cleaner look */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .glass-card {
+            background: rgba(21, 30, 46, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .table-row-hover:hover {
+            background: rgba(59, 130, 246, 0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased selection:bg-blue-500 selection:text-white pb-12">
+
+    <!-- Top Navigation / Header -->
+    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i data-lucide="calculator" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Crypto Margin Calculator
+                        <span class="hidden sm:inline-block text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Journal Edition</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Dynamic RRR & Leverage Position Sizing</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="toggleGuideBtn" onclick="toggleGuide()" class="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/70 transition">
+                    <i data-lucide="help-circle" class="w-4 h-4 text-blue-400"></i>
+                    <span>How to Use</span>
+                </button>
+                <button onclick="resetDefaults()" class="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700/70 transition" title="Reset to Spreadsheet Defaults">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+
+        <!-- Collapsible Instructions Panel (From Spreadsheet) -->
+        <div id="guidePanel" class="hidden glass-card rounded-2xl p-5 border-l-4 border-l-blue-500 transition-all duration-200">
+            <div class="flex items-start justify-between">
+                <div class="space-y-2">
+                    <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="list-checks" class="w-4 h-4 text-blue-400"></i>
+                        Steps from your Trading Journal:
+                    </h2>
+                    <ol class="text-xs sm:text-sm text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
+                        <li>Place the amount of your capital in dollars into the designated <span class="text-white font-medium">"Capital ($)"</span> input.</li>
+                        <li>Choose or input your <span class="text-white font-medium">"Risk in %"</span> per trade using the input or quick-select buttons.</li>
+                        <li>Go to your chart using the <span class="text-blue-400 font-medium">Long/Short RRR tool in TradingView</span> and identify your Stop Loss % and Take Profit %.</li>
+                        <li>Input your Stop Loss % into the designated <span class="text-white font-medium">"Stop Loss %"</span> field (e.g., <code class="text-amber-300 font-mono">0.85</code> for 0.85%).</li>
+                        <li>The calculator automatically computes the <span class="text-emerald-400 font-medium">Suggested Margin</span> to use across every leverage tier.</li>
+                    </ol>
+                </div>
+                <button onclick="toggleGuide()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center gap-2 text-xs text-rose-400 font-medium">
+                <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i>
+                <span>Reminder: All formulas are locked and automated so your position sizing math stays 100% intact.</span>
+            </div>
+        </div>
+
+        <!-- Top Summary Metrics Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <!-- Loss / Trade -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                    <span>Risk / Loss per Trade</span>
+                    <i data-lucide="flame" class="w-4 h-4 text-rose-500"></i>
+                </div>
+                <div id="metricRiskDollar" class="text-xl sm:text-2xl font-bold font-mono text-rose-400 tracking-tight">$10.00</div>
+                <div id="metricRiskSub" class="text-[11px] text-slate-400 mt-1">100% of $10.00 capital</div>
+            </div>
+
+            <!-- Total Position Size -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                    <span>Total Position Size</span>
+                    <i data-lucide="layers" class="w-4 h-4 text-blue-400"></i>
+                </div>
+                <div id="metricPositionSize" class="text-xl sm:text-2xl font-bold font-mono text-white tracking-tight">$1,176.47</div>
+                <div id="metricPositionSub" class="text-[11px] text-slate-400 mt-1">Notional Value (Margin × Lev)</div>
+            </div>
+
+            <!-- Expected Profit -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                    <span>Expected Profit (TP)</span>
+                    <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+                <div id="metricProfitDollar" class="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tracking-tight">$0.00</div>
+                <div id="metricProfitSub" class="text-[11px] text-slate-400 mt-1">At 0.00% chart move</div>
+            </div>
+
+            <!-- Risk to Reward Ratio -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+                    <span>Risk / Reward Ratio</span>
+                    <i data-lucide="scale" class="w-4 h-4 text-indigo-400"></i>
+                </div>
+                <div id="metricRRR" class="text-xl sm:text-2xl font-bold font-mono text-indigo-300 tracking-tight">1 : 0.00</div>
+                <div id="metricRRRSub" class="text-[11px] text-slate-400 mt-1">Set TP % to view RRR</div>
+            </div>
+        </div>
+
+        <!-- Main Workspace Grid: Left Inputs (4 cols), Right Table (8 cols) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- Left Column: Trade Parameters Input Card -->
+            <div class="lg:col-span-4 space-y-5">
+                <div class="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-blue-400"></i>
+                            Trade Parameters
+                        </h2>
+                        <span class="text-[11px] font-mono text-slate-400">Auto-calculating</span>
+                    </div>
+
+                    <!-- 1. Capital Input -->
+                    <div class="space-y-1.5">
+                        <label for="capitalInput" class="block text-xs font-medium text-slate-300 flex justify-between">
+                            <span>Capital ($)</span>
+                            <span class="text-slate-500">Account Balance</span>
+                        </label>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-3.5 text-slate-400 font-mono text-sm">$</span>
+                            <input type="number" id="capitalInput" value="10.00" min="0" step="any"
+                                class="w-full pl-8 pr-16 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-white font-mono text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                                placeholder="10.00" oninput="calculateAll()">
+                            <span class="absolute right-3.5 text-[11px] font-mono text-slate-500">USDT</span>
+                        </div>
+                        <!-- Quick Capital Buttons -->
+                        <div class="flex flex-wrap gap-1.5 pt-1">
+                            <button onclick="setCapital(10)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">$10</button>
+                            <button onclick="setCapital(50)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">$50</button>
+                            <button onclick="setCapital(100)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">$100</button>
+                            <button onclick="setCapital(500)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">$500</button>
+                            <button onclick="setCapital(1000)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">$1,000</button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Risk in % Input -->
+                    <div class="space-y-1.5">
+                        <label for="riskInput" class="block text-xs font-medium text-slate-300 flex justify-between">
+                            <span>Risk in %</span>
+                            <span id="riskLabelHint" class="text-rose-400 font-mono">-$10.00 risk</span>
+                        </label>
+                        <div class="relative flex items-center">
+                            <input type="number" id="riskInput" value="100" min="0.01" max="100" step="any"
+                                class="w-full pl-3.5 pr-10 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-white font-mono text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                                placeholder="100" oninput="calculateAll()">
+                            <span class="absolute right-3.5 text-slate-400 font-mono text-sm">%</span>
+                        </div>
+                        <!-- Quick Risk % Presets (Dropdown replacement) -->
+                        <div class="grid grid-cols-6 gap-1.5 pt-1">
+                            <button onclick="setRisk(1)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition" data-val="1">1%</button>
+                            <button onclick="setRisk(2)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition" data-val="2">2%</button>
+                            <button onclick="setRisk(5)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition" data-val="5">5%</button>
+                            <button onclick="setRisk(10)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition" data-val="10">10%</button>
+                            <button onclick="setRisk(50)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition" data-val="50">50%</button>
+                            <button onclick="setRisk(100)" class="risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/40 transition" data-val="100">100%</button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Stop Loss % Input -->
+                    <div class="space-y-1.5">
+                        <label for="slInput" class="block text-xs font-medium text-slate-300 flex justify-between">
+                            <span>Stop Loss % <span class="text-slate-500 font-normal">(TradingView RRR)</span></span>
+                            <span class="text-amber-400 font-mono text-[11px]">Chart Distance</span>
+                        </label>
+                        <div class="relative flex items-center">
+                            <input type="number" id="slInput" value="0.85" min="0.001" step="0.05"
+                                class="w-full pl-3.5 pr-10 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-white font-mono text-base focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition"
+                                placeholder="0.85" oninput="calculateAll()">
+                            <span class="absolute right-3.5 text-slate-400 font-mono text-sm">%</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 pt-1">
+                            <button onclick="setSL(0.25)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">0.25%</button>
+                            <button onclick="setSL(0.50)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">0.50%</button>
+                            <button onclick="setSL(0.85)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">0.85%</button>
+                            <button onclick="setSL(1.00)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">1.00%</button>
+                            <button onclick="setSL(2.00)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-300 transition">2.00%</button>
+                        </div>
+                    </div>
+
+                    <!-- 4. Take Profit (TP) % Input -->
+                    <div class="space-y-1.5">
+                        <label for="tpInput" class="block text-xs font-medium text-slate-300 flex justify-between">
+                            <span>Take Profit (TP) %</span>
+                            <span class="text-emerald-400 font-mono text-[11px]">Optional Target</span>
+                        </label>
+                        <div class="relative flex items-center">
+                            <input type="number" id="tpInput" value="0.00" min="0" step="0.1"
+                                class="w-full pl-3.5 pr-10 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-white font-mono text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                                placeholder="0.00" oninput="calculateAll()">
+                            <span class="absolute right-3.5 text-slate-400 font-mono text-sm">%</span>
+                        </div>
+                        <!-- Quick RRR Target Generator Buttons -->
+                        <div class="flex items-center gap-1.5 pt-1">
+                            <span class="text-[11px] text-slate-400 mr-1">Auto-TP by RRR:</span>
+                            <button onclick="setTPByRRR(0)" class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-400 transition">0%</button>
+                            <button onclick="setTPByRRR(1)" class="text-[11px] font-mono px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-700/40 transition">1:1</button>
+                            <button onclick="setTPByRRR(2)" class="text-[11px] font-mono px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-700/40 transition">1:2</button>
+                            <button onclick="setTPByRRR(3)" class="text-[11px] font-mono px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-700/40 transition">1:3</button>
+                        </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="border-t border-slate-800/80 pt-4 space-y-4">
+                        <!-- 5. Custom Leverage Input -->
+                        <div class="space-y-1.5">
+                            <label for="customLevInput" class="block text-xs font-medium text-slate-300 flex justify-between">
+                                <span>Custom Leverage Tier (Optional)</span>
+                                <span class="text-blue-400 font-mono text-[11px]">Pin to table</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1 flex items-center">
+                                    <input type="number" id="customLevInput" value="" min="1" max="500" step="1"
+                                        class="w-full pl-3.5 pr-8 py-2 bg-slate-900/90 border border-slate-700/80 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition"
+                                        placeholder="e.g. 25 or 75" oninput="calculateAll()">
+                                    <span class="absolute right-3 text-slate-400 font-mono text-xs">x</span>
+                                </div>
+                                <button onclick="clearCustomLev()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 6. Exchange Fee Toggle (OKX / Binance Standard) -->
+                        <div class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800/90 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="percent" class="w-4 h-4 text-amber-400"></i>
+                                    <div>
+                                        <span class="text-xs font-medium text-white block">Include Exchange Fees</span>
+                                        <span class="text-[11px] text-slate-400">Est. Round-Trip Futures Fee</span>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="feeToggle" class="sr-only peer" onchange="calculateAll()">
+                                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <div id="feeDetailsBox" class="hidden pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                                <select id="feeRateSelect" onchange="calculateAll()" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none">
+                                    <option value="0.10">Taker + Taker (0.10% total)</option>
+                                    <option value="0.07">Maker + Taker (0.07% total)</option>
+                                    <option value="0.04">Maker + Maker (0.04% total)</option>
+                                </select>
+                                <span id="estFeeDollar" class="font-mono text-amber-400 font-medium">-$1.18 fee</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Right Column: Dynamic Leverage Breakdown Table -->
+            <div class="lg:col-span-8 space-y-4">
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <!-- Table Header Bar -->
+                    <div class="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                                <i data-lucide="table-2" class="w-4 h-4 text-blue-400"></i>
+                                Leverage & Suggested Margin Breakdown
+                            </h2>
+                            <p class="text-xs text-slate-400 mt-0.5">Click any row's <span class="text-blue-400 font-medium">Copy Margin</span> button to paste directly into OKX/Binance.</p>
+                        </div>
+
+                        <!-- Legend Badges -->
+                        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Fits Capital
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20" title="Suggested margin exceeds your total entered Capital">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Exceeds Capital
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20" title="Stop Loss % with leverage is near or above 100% ROE">
+                                <span class="w-2 h-2 rounded-full bg-rose-500"></span> High Liq. Risk
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Responsive Table Wrapper -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900/90 border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                    <th class="py-3.5 px-4">Leverage</th>
+                                    <th class="py-3.5 px-4">Loss / Trade</th>
+                                    <th class="py-3.5 px-4 bg-blue-500/5 text-blue-300">Suggested Margin</th>
+                                    <th class="py-3.5 px-4">Stop Loss % w/ Lev</th>
+                                    <th class="py-3.5 px-4">TP % w/ Lev</th>
+                                    <th class="py-3.5 px-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leverageTableBody" class="divide-y divide-slate-800/60 font-mono text-xs sm:text-sm">
+                                <!-- Populated dynamically via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Table Footer Formula Reference -->
+                    <div class="px-5 py-3.5 bg-slate-900/60 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="function-square" class="w-4 h-4 text-slate-500 shrink-0"></i>
+                            <span>Formula: <code class="text-slate-300 font-mono">Margin = (Capital × Risk%) ÷ (Stop Loss% × Leverage)</code></span>
+                        </div>
+                        <div id="minLevHint" class="text-blue-400 font-medium">
+                            Min. leverage to fit $10.00 capital: 118x
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast Notification for Clipboard Copy -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-emerald-600 text-white shadow-xl shadow-emerald-900/40 text-xs sm:text-sm font-medium">
+            <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+            <span id="toastMessage">Copied Margin: $588.24</span>
+        </div>
+    </div>
+
+    <script>
+        // Exact Leverage Tiers from the user's spreadsheet
+        // Note: In the user's screenshot, rows are 2, 4, 5, 15, 10, 20, 30, 50, 100.
+        // We include all those exact tiers sorted cleanly, plus any custom tier.
+        const BASE_LEVERAGES = [2, 4, 5, 10, 15, 20, 30, 50, 100];
+
+        // Quick Setters
+        function setCapital(val) {
+            document.getElementById('capitalInput').value = val.toFixed(2);
+            calculateAll();
+        }
+
+        function setRisk(val) {
+            document.getElementById('riskInput').value = val;
+            calculateAll();
+        }
+
+        function setSL(val) {
+            document.getElementById('slInput').value = val.toFixed(2);
+            calculateAll();
+        }
+
+        function setTPByRRR(rrr) {
+            const sl = parseFloat(document.getElementById('slInput').value) || 0;
+            const tp = sl * rrr;
+            document.getElementById('tpInput').value = tp.toFixed(2);
+            calculateAll();
+        }
+
+        function clearCustomLev() {
+            document.getElementById('customLevInput').value = '';
+            calculateAll();
+        }
+
+        function toggleGuide() {
+            const panel = document.getElementById('guidePanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function resetDefaults() {
+            document.getElementById('capitalInput').value = '10.00';
+            document.getElementById('riskInput').value = '100';
+            document.getElementById('slInput').value = '0.85';
+            document.getElementById('tpInput').value = '0.00';
+            document.getElementById('customLevInput').value = '';
+            document.getElementById('feeToggle').checked = false;
+            calculateAll();
+            showToast('Reset to spreadsheet defaults ($10, 100% Risk, 0.85% SL)');
+        }
+
+        // Format currency helper
+        function formatUSD(val) {
+            if (!isFinite(val) || isNaN(val)) return '$0.00';
+            return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatNum(val) {
+            if (!isFinite(val) || isNaN(val)) return '0.00';
+            return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Copy to clipboard using execCommand for iframe compatibility
+        function copyMargin(marginValue, lev) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = marginValue;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                showToast(`Copied ${lev}x Margin: $${marginValue}`);
+            } catch (err) {
+                showToast(`Margin: $${marginValue}`);
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        let toastTimeout;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            toastMsg.textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2600);
+        }
+
+        // Main Calculation Function
+        function calculateAll() {
+            const capital = Math.max(0, parseFloat(document.getElementById('capitalInput').value) || 0);
+            const riskPct = Math.max(0, parseFloat(document.getElementById('riskInput').value) || 0);
+            const slPct = Math.max(0, parseFloat(document.getElementById('slInput').value) || 0);
+            const tpPct = Math.max(0, parseFloat(document.getElementById('tpInput').value) || 0);
+            const customLev = parseInt(document.getElementById('customLevInput').value, 10);
+            const includeFees = document.getElementById('feeToggle').checked;
+            const feeRatePct = parseFloat(document.getElementById('feeRateSelect').value) || 0.10;
+
+            // Highlight active Risk preset button
+            document.querySelectorAll('.risk-preset').forEach(btn => {
+                const btnVal = parseFloat(btn.getAttribute('data-val'));
+                if (btnVal === riskPct) {
+                    btn.className = 'risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/40 transition';
+                } else {
+                    btn.className = 'risk-preset text-[11px] font-mono py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-transparent transition';
+                }
+            });
+
+            // 1. Core Math from Spreadsheet
+            // Loss / Trade ($) = Capital * (Risk % / 100)
+            const lossPerTrade = capital * (riskPct / 100);
+
+            // Total Position Size (Notional $) = Loss per Trade / (Stop Loss % / 100)
+            const positionSize = slPct > 0 ? lossPerTrade / (slPct / 100) : 0;
+
+            // Round-trip Exchange Fee ($)
+            const estFeeDollar = includeFees ? positionSize * (feeRatePct / 100) : 0;
+
+            // Expected Profit ($) = Position Size * (TP % / 100) - Fees
+            const grossProfit = positionSize * (tpPct / 100);
+            const netProfit = Math.max(0, grossProfit - estFeeDollar);
+
+            // Risk to Reward Ratio
+            const rrr = slPct > 0 ? (tpPct / slPct) : 0;
+
+            // Update Fee Box UI
+            const feeDetailsBox = document.getElementById('feeDetailsBox');
+            if (includeFees) {
+                feeDetailsBox.classList.remove('hidden');
+                document.getElementById('estFeeDollar').textContent = `-${formatUSD(estFeeDollar)} fee`;
+            } else {
+                feeDetailsBox.classList.add('hidden');
+            }
+
+            // Update Top Metric Cards
+            document.getElementById('riskLabelHint').textContent = `-${formatUSD(lossPerTrade)} risk`;
+            document.getElementById('metricRiskDollar').textContent = formatUSD(lossPerTrade);
+            document.getElementById('metricRiskSub').textContent = includeFees 
+                ? `${formatUSD(lossPerTrade + estFeeDollar)} incl. ${formatUSD(estFeeDollar)} fee`
+                : `${riskPct}% of ${formatUSD(capital)} capital`;
+
+            document.getElementById('metricPositionSize').textContent = formatUSD(positionSize);
+            document.getElementById('metricPositionSub').textContent = slPct > 0 
+                ? `For ${slPct}% SLchart distance` 
+                : `Enter a Stop Loss % > 0`;
+
+            document.getElementById('metricProfitDollar').textContent = formatUSD(includeFees ? netProfit : grossProfit);
+            document.getElementById('metricProfitSub').textContent = includeFees && tpPct > 0
+                ? `Net after ${formatUSD(estFeeDollar)} fee (${tpPct}% TP)`
+                : `At ${tpPct.toFixed(2)}% TP chart move`;
+
+            document.getElementById('metricRRR').textContent = `1 : ${rrr.toFixed(2)}`;
+            document.getElementById('metricRRRSub').textContent = rrr >= 2 
+                ? 'Favorable Risk/Reward' 
+                : (rrr > 0 ? 'Moderate Risk/Reward' : 'Set TP % to view RRR');
+
+            // Minimum Leverage needed so Margin <= Capital
+            // Margin <= Capital  =>  PositionSize / Lev <= Capital  =>  Lev >= PositionSize / Capital
+            const minLevForCapital = capital > 0 && positionSize > 0 ? Math.ceil(positionSize / capital) : 0;
+            const minLevEl = document.getElementById('minLevHint');
+            if (minLevForCapital > 1) {
+                minLevEl.textContent = `Min. leverage so Margin ≤ Capital (${formatUSD(capital)}): ${minLevForCapital}x`;
+            } else {
+                minLevEl.textContent = `All leverage tiers fit within your ${formatUSD(capital)} capital`;
+            }
+
+            // Build Leverage List
+            let leverages = [...BASE_LEVERAGES];
+            if (!isNaN(customLev) && customLev > 0 && !leverages.includes(customLev)) {
+                leverages.push(customLev);
+                leverages.sort((a, b) => a - b);
+            }
+
+            // Render Table Rows
+            const tbody = document.getElementById('leverageTableBody');
+            tbody.innerHTML = '';
+
+            leverages.forEach(lev => {
+                const isCustom = (!isNaN(customLev) && lev === customLev && !BASE_LEVERAGES.includes(customLev));
+                
+                // Spreadsheet Formulas:
+                // Margin = Position Size / Leverage
+                const margin = slPct > 0 ? (positionSize / lev) : 0;
+                // Stop Loss % w/ Lev = Stop Loss % * Leverage
+                const slWithLev = slPct * lev;
+                // TP % w/ Lev = TP % * Leverage
+                const tpWithLev = tpPct * lev;
+
+                // Status checks
+                const exceedsCapital = margin > capital + 0.004; // slight tolerance for rounding
+                const isLiquidationRisk = slWithLev >= 85; // 85%+ ROE loss is high liquidation danger on most exchanges
+                const isTotalLiquidation = slWithLev >= 100;
+
+                // Row styling based on risk/capital
+                let rowClass = 'table-row-hover transition-colors ';
+                if (isCustom) {
+                    rowClass += 'bg-indigo-950/30 ';
+                }
+
+                // Margin Badge / Color
+                let marginColorClass = 'text-emerald-400 font-bold';
+                let statusBadge = '';
+                if (exceedsCapital) {
+                    marginColorClass = 'text-amber-300 font-semibold';
+                    statusBadge = `<span class="ml-2 text-[10px] font-sans px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30" title="Requires more margin than your ${formatUSD(capital)} capital"> > Cap</span>`;
+                }
+
+                // Stop Loss w/ Lev Color
+                let slLevColor = 'text-slate-200';
+                let liqBadge = '';
+                if (isTotalLiquidation) {
+                    slLevColor = 'text-rose-400 font-bold';
+                    liqBadge = `<span class="ml-1.5 text-[10px] font-sans px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">LIQ ≥100%</span>`;
+                } else if (isLiquidationRisk) {
+                    slLevColor = 'text-amber-400 font-semibold';
+                    liqBadge = `<span class="ml-1.5 text-[10px] font-sans px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">Near Liq</span>`;
+                }
+
+                const marginFormatted = formatNum(margin);
+
+                const tr = document.createElement('tr');
+                tr.className = rowClass;
+                tr.innerHTML = `
+                    <!-- Leverage Column -->
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center min-w-[3rem] px-2.5 py-1 rounded-lg font-bold text-xs ${isCustom ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white border border-slate-700'}">
+                                ${lev}x
+                            </span>
+                            ${isCustom ? '<span class="text-[10px] font-sans text-blue-400 font-medium">Custom</span>' : ''}
+                        </div>
+                    </td>
+
+                    <!-- Loss / Trade Column -->
+                    <td class="py-3.5 px-4 whitespace-nowrap text-rose-400 font-medium">
+                        ${formatUSD(lossPerTrade)}
+                    </td>
+
+                    <!-- Suggested Margin Column -->
+                    <td class="py-3.5 px-4 whitespace-nowrap bg-blue-500/[0.03]">
+                        <div class="flex items-center">
+                            <span class="text-slate-500 mr-0.5">$</span>
+                            <span class="${marginColorClass} text-sm sm:text-base">${marginFormatted}</span>
+                            ${statusBadge}
+                        </div>
+                    </td>
+
+                    <!-- Stop Loss % w/ Lev Column -->
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <span class="${slLevColor}">${formatNum(slWithLev)}%</span>
+                            ${liqBadge}
+                        </div>
+                    </td>
+
+                    <!-- TP % w/ Lev Column -->
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="${tpWithLev > 0 ? 'text-emerald-400 font-medium' : 'text-slate-500'}">
+                            ${formatNum(tpWithLev)}%
+                        </span>
+                    </td>
+
+                    <!-- Action / Copy Margin Button -->
+                    <td class="py-3.5 px-4 whitespace-nowrap text-right">
+                        <button onclick="copyMargin('${margin.toFixed(2)}', ${lev})" 
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans font-medium bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-700/80 hover:border-blue-500 transition shadow-sm">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            <span>Copy</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Re-render Lucide icons for newly injected rows
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        // Initialize on window load
+        window.onload = function() {
+            calculateAll();
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        };
+    </script>
+</body>
+</html>
